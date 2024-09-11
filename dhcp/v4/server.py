@@ -22,11 +22,14 @@ from .rfc2132 import RFC2132OptionType
 
 from ..debug_helpers.pcap import PCAP, LinkLayer
 
+
 class Error(Exception):
 	pass
 
+
 class IPInUseError(Error):
 	pass
+
 
 def get_client_id(packet):
 	if not isinstance(packet, DHCPMessage):
@@ -34,7 +37,7 @@ def get_client_id(packet):
 
 	try:
 		client_id = packet.options[RFC2132OptionType.CLIENT_IDENTIFIER]
-	except Exception as e:
+	except Exception:
 		client_id = bytes([packet.hardware_type, *packet.hardware_address])
 
 	# preliminary notes: two different OSes on the same hardware will generally
@@ -44,36 +47,40 @@ def get_client_id(packet):
 	# seems to be the de facto standard
 	return client_id
 
+
 class BaseDHCPServer:
 	def init_recv(self, interface):
 		self.receive_socket = listen(interface + b'\0')
 		self.receive_socket.settimeout(5)
+
 	def init_send(self, interface):
 		self.send_socket = socket.socket(socket.AF_PACKET, socket.SOCK_RAW)
 		self.send_socket.bind((interface.decode('utf-8'), socket.IPPROTO_UDP))
 		self.ip = get_ip_from_iface(interface)
+
 	def __init__(self, logger, interface, pcap=None):
 		self.housekeeping = []
 		self.logger = logger
 		try:
 			interface = bytes(interface, 'utf-8')
-		except:
+		except TypeError:
 			interface = bytes(interface)
 		self.interface = interface
 		self.pcap = pcap
 
 		self.init_recv(interface)
 		self.init_send(interface)
+
 	def recv(self):
 		data, addr = self.receive_socket.recvfrom(65535)
 
-		destination_mac = get_mac_from_iface(self.interface)
+		# destination_mac = get_mac_from_iface(self.interface)
 		destination_ip = IPv4Address(get_ip_from_iface(self.interface))
 		destination_port = DHCP_SERVER_PORT
-		try:
-			source_mac = DHCPMessage.decode(data).hardware_address
-		except:
-			source_mac = b'\xFE\xED\xFA\xCE\xBE\xEF'
+		# try:
+		# 	source_mac = DHCPMessage.decode(data).hardware_address
+		# except Exception:
+		# 	source_mac = b'\xFE\xED\xFA\xCE\xBE\xEF'
 		source_ip = IPv4Address(addr[0])
 		source_port = addr[1]
 
@@ -101,6 +108,7 @@ class BaseDHCPServer:
 			self.pcap.add(ipv4)
 
 		return data, addr
+
 	def send(self, data, destination_mac, destination_ip='0.0.0.0'):
 		# NOTE(tori): why must a simple DHCP server know how to encapsulate
 		# all this stuff manually?
@@ -196,9 +204,11 @@ class BaseDHCPServer:
 			destination_mac=destination_mac,
 			destination_ip=destination_ip
 		)
+
 	def handle_housekeeping(self):
 		for method in self.housekeeping:
 			method()
+
 
 class Server(BaseDHCPServer):
 	def __init__(self, logger, interface, pool=None, options=None,
@@ -231,7 +241,7 @@ class Server(BaseDHCPServer):
 		self.pool = pool
 
 		server_options = {}
-		if set_default_options: 
+		if set_default_options:
 			default_options = {
 				RFC2132OptionType.SERVER_IDENTIFIER: ip,
 				RFC2132OptionType.SUBNET_MASK: mask,
@@ -268,14 +278,15 @@ class Server(BaseDHCPServer):
 			ip = self.unassigned.pop()
 			self.unassigned.add(ip)
 			return ip
-		except KeyError as e:
+		except KeyError:
 			self.logger.info('could not get IP address')
 			return None
 
 	def address_sanity_check(self):
-		# NOTE(tori): check that each address in pool appears only once in 
+		# NOTE(tori): check that each address in pool appears only once in
 		# either assigned or assigned
 		assert set(self.pool) == (self.unassigned ^ self.assigned)
+
 	def assign_ip(self, address):
 		if address is None:
 			raise Exception(address)
@@ -286,6 +297,7 @@ class Server(BaseDHCPServer):
 			self.assigned.add(address)
 		except KeyError:
 			raise IPInUseError('address %r could not be assigned' % address)
+
 	def release_ip(self, address):
 		self.address_sanity_check()
 		address = IPv4Address(address)
@@ -305,7 +317,7 @@ class Server(BaseDHCPServer):
 		# lifetimes
 		client_data['last_update'] = monotonic()
 		return client_data
-		
+
 	def make_response_packet(self, request, message_type):
 		response = DHCPMessage(op=Operation.REPLY)
 		response.hardware_type = HardwareType.ETH10MB
@@ -392,7 +404,7 @@ class Server(BaseDHCPServer):
 				RFC2132OptionType.REQUESTED_IP_ADDRESS,
 				RFC2132OptionType.PARAMETER_REQUEST_LIST,
 				# NOTE(tori): illegal in rfc2131, determinant in rfc6482
-				#RFC2132OptionType.CLIENT_IDENTIFIER,
+				# RFC2132OptionType.CLIENT_IDENTIFIER,
 				RFC2132OptionType.MAXIMUM_DHCP_MESSAGE_SIZE,
 			)
 
@@ -438,7 +450,7 @@ class Server(BaseDHCPServer):
 			illegal_options += (
 				RFC2132OptionType.REQUESTED_IP_ADDRESS,
 				RFC2132OptionType.PARAMETER_REQUEST_LIST,
-				#RFC2132OptionType.CLIENT_IDENTIFIER,
+				# RFC2132OptionType.CLIENT_IDENTIFIER,
 				RFC2132OptionType.MAXIMUM_DHCP_MESSAGE_SIZE
 			)
 
@@ -461,7 +473,7 @@ class Server(BaseDHCPServer):
 			optional_options += (
 				RFC2132OptionType.MESSAGE_TYPE,
 				# NOTE(tori): client identifier is removed in rfc6482
-				#RFC2132OptionType.CLIENT_IDENTIFIER,
+				# RFC2132OptionType.CLIENT_IDENTIFIER,
 				RFC2132OptionType.VENDOR_CLASS_IDENTIFIER,
 			)
 			illegal_options += (
@@ -504,7 +516,7 @@ class Server(BaseDHCPServer):
 		for option in illegal_options:
 			if option in response.options:
 				self.logger.warning('illegal option in %r: %r'
-					% (message_type, option))
+					% (res_message_type, option))
 				del response.options[option]
 
 	def handle_options(self, request, response):
@@ -551,7 +563,7 @@ class Server(BaseDHCPServer):
 		return response
 
 	def do_INFORM(self, request):
-		client_data = self.get_client_data(get_client_id(request))
+		# client_data = self.get_client_data(get_client_id(request))
 
 		response = self.make_response_packet(request, MessageType.ACK)
 
@@ -588,6 +600,7 @@ class Server(BaseDHCPServer):
 			self.logger.debug('%s - lease expired' % client_id)
 			del self.client_data[client_id]
 
+
 # TODO(tori): implement
 class RelayAgent(BaseDHCPServer):
 	def __init__(self, logger, interface, server):
@@ -597,6 +610,7 @@ class RelayAgent(BaseDHCPServer):
 		self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR,
 			1)
 		self.server_socket.bind(('0.0.0.0', DHCP_CLIENT_PORT))
+
 
 def configure_logging(output='-', level='INFO'):
 	if isinstance(output, str):
@@ -620,20 +634,24 @@ def configure_logging(output='-', level='INFO'):
 
 	return logger
 
+
 class DHCPDaemon:
 	def client_target(self):
 		while self.running:
 			self.server.handle_client()
 			sleep(1)
+
 	def housekeeping_target(self):
 		while self.running:
 			self.server.handle_housekeeping()
 			sleep(10)
+
 	def __init__(self, *args, **kwargs):
 		self.server = Server(*args, **kwargs)
 		self.running = False
 		self.client_thread = None
 		self.housekeeping_thread = None
+
 	def run(self):
 		if self.running:
 			return False
@@ -643,6 +661,7 @@ class DHCPDaemon:
 		self.client_thread.start()
 		self.housekeeping_thread.start()
 		return True
+
 	def stop(self):
 		if not self.running:
 			return False
@@ -651,10 +670,8 @@ class DHCPDaemon:
 		self.housekeeping_thread.join()
 		return True
 
-logger = None
-server = None
+
 def main():
-	global server, logger
 	import argparse
 
 	parser = argparse.ArgumentParser()
@@ -688,6 +705,7 @@ def main():
 		logger.error('unhandled server error (caused by %r)', e)
 		if __debug__:
 			raise e
+
 
 if __name__ == '__main__':
 	main()

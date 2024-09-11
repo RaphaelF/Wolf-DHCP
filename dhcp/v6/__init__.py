@@ -21,7 +21,7 @@ try:
 		unregister as unregister_codec, get as get_codec,
 		encode as encode_option, decode as decode_option)
 except ImportError as e:
-	print('Could not import DHCP')
+	print('Could not import DHCP: %r' % e)
 	raise
 
 option_codecs_all = ['register_codec', 'unregister_codec', 'get_codec',

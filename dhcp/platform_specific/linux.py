@@ -35,6 +35,7 @@ def get_mask_from_iface(ifname):
 
 	return IPv4Address(packed)
 
+
 def get_ip_from_iface(ifname):
 	# NOTE(tori): this method is portable, copy and paste it into any file
 
@@ -67,6 +68,7 @@ def get_ip_from_iface(ifname):
 
 	return IPv4Address(packed)
 
+
 def get_mac_from_iface(ifname):
 	# NOTE(tori): this method is portable, copy and paste it into any file
 
@@ -76,7 +78,7 @@ def get_mac_from_iface(ifname):
 	# NOTE(tori): constant from sys/ioctl.h
 	SIOCGIFHWADDR = 0x8927
 
-	IPv4Address = __import__('ipaddress').IPv4Address
+	# IPv4Address = __import__('ipaddress').IPv4Address
 	socket = __import__('socket')
 	ioctl = __import__('fcntl').ioctl
 	pack = __import__('struct').pack
@@ -99,8 +101,10 @@ def get_mac_from_iface(ifname):
 
 	return packed
 
+
 def list_ifaces():
 	return __import__('os').listdir('/sys/class/net')
+
 
 def broadcast_listen(target_address, target_port, target_type,
 	target_family=None, interface=None):
@@ -119,6 +123,7 @@ def broadcast_listen(target_address, target_port, target_type,
 			return sock
 	else:
 		raise Exception('could not listen')
+
 
 def multicast_listen(target_address, target_port, target_type,
 	target_family=None, bind_address=None):

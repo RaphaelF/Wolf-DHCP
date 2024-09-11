@@ -5,6 +5,7 @@ import enum
 # NOTE(tori): hardware types come from the following:
 # https://www.iana.org/assignments/arp-parameters/arp-parameters.xhtml
 
+
 @enum.unique
 class HardwareType(enum.IntEnum):
 	RESERVED = 0

@@ -3,6 +3,7 @@
 import enum
 from .optiontypes import register as register_optiontype
 
+
 class RFC2132OptionType(enum.IntEnum):
 	# RFC1497 Vendor Extensions
 	PAD = 0
@@ -87,6 +88,7 @@ class RFC2132OptionType(enum.IntEnum):
 	REBINDING_TIME_VALUE = 59
 	VENDOR_CLASS_IDENTIFIER = 60
 	CLIENT_IDENTIFIER = 61
+
 
 register_optiontype(RFC2132OptionType)
 

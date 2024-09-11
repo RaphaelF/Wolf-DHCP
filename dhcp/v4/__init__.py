@@ -21,7 +21,7 @@ try:
 		unregister as unregister_codec, get as get_codec,
 		encode as encode_option, decode as decode_option)
 except ImportError as e:
-	print('Could not import DHCP')
+	print('Could not import DHCP: %r' % e)
 	raise
 
 option_codecs_all = ['register_codec', 'unregister_codec', 'get_codec',
@@ -39,7 +39,9 @@ __all__ = [
 # NOTE(tori): rfc2131 - done
 # NOTE(tori): rfc2132 - done
 # NOTE(tori): rfc3396 - done
-# XXX(tori): rfc4361 - what we're doing seems to be according to spec; it seems to be mostly client-specific, so long as we don't try and parse client identifiers
+# XXX(tori): rfc4361 - what we're doing seems to be according to spec; it seems
+# to be mostly client-specific, so long as we don't try and parse client
+# identifiers
 # NOTE(tori): rfc6842 - done
 
 # vim:set ft=python ts=4 sw=4 ai noet cc=80:

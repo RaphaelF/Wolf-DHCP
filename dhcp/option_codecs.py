@@ -2,8 +2,10 @@
 
 __all__ = ['CodecError', 'Codec', 'CodecRegistry']
 
+
 class CodecError(Exception):
 	pass
+
 
 class Codec:
 	def __init__(self, *, name=None, codecs=None):
@@ -13,6 +15,7 @@ class Codec:
 		if codecs is None:
 			codecs = {}
 		self.codecs = codecs
+
 	def get_codec(self, option):
 		try:
 			return self.codecs[option]
@@ -20,12 +23,13 @@ class Codec:
 			raise CodecError('option %r cannot be encoded by this codec (%s)'
 				% (option, self.name)
 			) from None
-#	def get_encoder(self, option):
-#		encoder, decoder = self.get_codec(option)
-#		return encoder
-#	def get_decoder(self, option):
-#		encoder, decoder = self.get_codec(option)
-#		return decoder
+	# def get_encoder(self, option):
+	# 	encoder, decoder = self.get_codec(option)
+	# 	return encoder
+	# def get_decoder(self, option):
+	# 	encoder, decoder = self.get_codec(option)
+	# 	return decoder
+
 
 class CodecRegistry:
 	def __init__(self):
@@ -52,8 +56,11 @@ class CodecRegistry:
 				continue
 		else:
 			if ignore_unknown:
-				encoder = lambda value: value
-				decoder = lambda value: value
+				def encoder(value):
+					return value
+
+				def decoder(value):
+					return value
 				return encoder, decoder
 			else:
 				raise ValueError(

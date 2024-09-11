@@ -13,10 +13,10 @@ from warnings import warn
 try:
 	from ..hardwaretype import HardwareType
 except ImportError:
-# NOTE(tori): pretty much every network has settled on ethernet encapsulation
-# if you're doing something esoteric, please let me know, and I'll add support,
-# but I don't think any other DHCP servers have put in much effort to implement
-# other hardware types
+	# NOTE(tori): pretty much every network has settled on ethernet
+	# encapsulation if you're doing something esoteric, please let me know, and
+	# I'll add support, but I don't think any other DHCP servers have put in
+	# much effort to implement other hardware types
 	@enum.unique
 	class HardwareType(enum.IntEnum):
 		ETH10MB = 1
@@ -26,6 +26,8 @@ except ImportError:
 from .rfc2132 import RFC2132OptionType, rfc2132_option_codec
 from .optiontypes import get as get_option
 from .option_codecs import encode as encode_option, decode as decode_option
+from ..error import DHCPv4Error
+
 
 # NOTE(tori): this will actually protect earlier versions if we test using
 # python3 versions with enums and don't generate enums dynamically
@@ -34,9 +36,11 @@ class Operation(enum.IntEnum):
 	REQUEST = 1
 	REPLY = 2
 
+
 @enum.unique
 class Flags(enum.IntFlag):
 	BROADCAST = 1 << 15
+
 
 @enum.unique
 class MessageType(enum.IntEnum):
@@ -91,40 +95,51 @@ class OptionMap:
 	def __init__(self, values=None):
 		values = self.check_options(values)
 		self._options = values
+
 	def __getitem__(self, key):
 		key = get_option(key, ignore_unknown=True)
 		if key in (RFC2132OptionType.PAD, RFC2132OptionType.END):
 			return
 		return decode_option(key, self._options.__getitem__(key),
 			ignore_unknown=True)
+
 	def __setitem__(self, key, value):
 		key = get_option(key, ignore_unknown=True)
 		if key in (RFC2132OptionType.PAD, RFC2132OptionType.END):
 			return
 		self._options.__setitem__(key, encode_option(key, value,
 			ignore_unknown=True))
+
 	def __delitem__(self, key):
 		key = get_option(key, ignore_unknown=True)
 		self._options.__delitem__(key)
+
 	def __contains__(self, key):
 		key = get_option(key, ignore_unknown=True)
 		return self._options.__contains__(key)
+
 	def __iter__(self):
 		return iter(self._options)
+
 	def keys(self):
 		return self._options.keys()
+
 	def values(self):
 		return self._options.values()
+
 	def items(self):
 		return self._options.items()
+
 	def __repr__(self):
 		return '%s(%r)' % (type(self).__name__, self._options)
+
 	def get(self, key, default=None):
 		key = get_option(key, ignore_unknown=True)
 		value = self._options.get(key)
 		if value is None:
 			return default
 		return decode_option(key, value, ignore_unknown=True)
+
 	def encode(self, pad_length=None):
 		opts = b''
 		for key, value in self._options.items():
@@ -137,6 +152,7 @@ class OptionMap:
 			pad_needed = max(0, pad_length - len(opts))
 			opts += b'\x00'*pad_needed
 		return opts
+
 	@staticmethod
 	def decode_bytes(raw_data):
 		options = []
@@ -147,7 +163,7 @@ class OptionMap:
 
 		while option_tag != 0xFF:
 			if not raw_data:
-				#print('no end tag')
+				print('no end tag')
 				break
 			raw_data = raw_data[skip:]
 
@@ -162,10 +178,11 @@ class OptionMap:
 			options.append((option_tag, option_data))
 
 		return options
+
 	@classmethod
 	def decode_from_packet(cls, packet):
 		if not packet.is_magic_cookie_ok():
-			raise Error('malformed packet: %r' % packet)
+			raise DHCPv4Error('malformed packet: %r' % packet)
 		raw_data = packet.raw_data['vend'][len(DHCP_MAGIC_COOKIE):]
 
 		options = cls.decode_bytes(raw_data)
@@ -173,11 +190,11 @@ class OptionMap:
 		option_overload = None
 		for option_tag, option_value in options:
 			# NOTE(tori): we take the last instance rather than outright
-			# rejecting the packet (in case of multiple occurrences), because we're
-			# nice like that
-			# NOTE(tori): option tag 52 is option overload tag, which can have a
-			# single byte with the value of 1, 2, or 3, representing options in
-			# 'file', 'sname', or 'file' and 'sname', respectively
+			# rejecting the packet (in case of multiple occurrences), because
+			# we're nice like that
+			# NOTE(tori): option tag 52 is option overload tag, which can have
+			# a single byte with the value of 1, 2, or 3, representing options
+			# in 'file', 'sname', or 'file' and 'sname', respectively
 			if option_tag == 52:
 				option_overload, = struct.unpack('!B', option_value)
 				if option_overload not in (1, 2, 3):
@@ -197,31 +214,33 @@ class OptionMap:
 				]
 
 		return cls(options)
+
 	def asdict(self):
 		return {**self._options}
 
+
 class BOOTP:
 	NAMES = namedtuple('Fields', 'op htype hlen hops xid secs ciaddr yiaddr'
-		' siaddr giaddr chaddr sname file vend', defaults=(None,)*14
-	)
+		' siaddr giaddr chaddr sname file vend', defaults=(None,)*14)
 	CODEC = struct.Struct(
-		'!'		# network byte order (big)
-		'BBBB'	# op, htype, hlen, hops
-		'I'		# xid
-		'H2x'	# secs, 2 unused bytes
-		'4s'	# ciaddr (client ip)
-		'4s'	# yiaddr (given ip by server)
-		'4s'	# siaddr (server ip address)
-		'4s'	# giaddr (gateway ip address)
-		'16s'	# chaddr (client hardware address)
-		'64s'	# server host name (null-terminated)
-		'128s'	# boot file name (null-terminated)
-		'64s'	# vendor-specific area
+		'!'			# network byte order (big)
+		'BBBB'		# op, htype, hlen, hops
+		'I'			# xid
+		'H2x'		# secs, 2 unused bytes
+		'4s'		# ciaddr (client ip)
+		'4s'		# yiaddr (given ip by server)
+		'4s'		# siaddr (server ip address)
+		'4s'		# giaddr (gateway ip address)
+		'16s'		# chaddr (client hardware address)
+		'64s'		# server host name (null-terminated)
+		'128s'		# boot file name (null-terminated)
+		'64s'		# vendor-specific area
 	)
 
 	@property
 	def operation(self):
 		return Operation(self.raw_data['op'])
+
 	@operation.setter
 	def operation(self, value):
 		self.raw_data['op'] = Operation(value).value
@@ -229,6 +248,7 @@ class BOOTP:
 	@property
 	def hardware_type(self):
 		return HardwareType(self.raw_data['htype'])
+
 	@hardware_type.setter
 	def hardware_type(self, value):
 		self.raw_data['htype'] = HardwareType(value).value
@@ -236,10 +256,11 @@ class BOOTP:
 	@property
 	def hardware_address(self):
 		return self.raw_data['chaddr'][:self.raw_data['hlen']]
+
 	@hardware_address.setter
 	def hardware_address(self, value):
 		if len(value) > 16:
-			raise Error('hardware address too long: `%r`' % value)
+			raise DHCPv4Error('hardware address too long: `%r`' % value)
 		self.raw_data['chaddr'] = (
 			bytes(value) + b'\0'*16
 		)[:16]
@@ -248,33 +269,37 @@ class BOOTP:
 	@property
 	def hops(self):
 		return self.raw_data['hops']
+
 	@hops.setter
 	def hops(self, value):
 		if value not in range(0x100):
-			raise Error('`%r` not in range(0x100)' % value)
+			raise DHCPv4Error('`%r` not in range(0x100)' % value)
 		self.raw_data['hops'] = value
 
 	@property
 	def transaction_id(self):
 		return self.raw_data['xid']
+
 	@transaction_id.setter
 	def transaction_id(self, value):
 		if value not in range(0x100000000):
-			raise Error('`%r` not in range(0x100000000)' % value)
+			raise DHCPv4Error('`%r` not in range(0x100000000)' % value)
 		self.raw_data['xid'] = value
 
 	@property
 	def seconds(self):
 		return self.raw_data['secs']
+
 	@seconds.setter
 	def seconds(self, value):
 		if value not in range(0x10000):
-			raise Error('`%r` not in range(0x10000)' % value)
+			raise DHCPv4Error('`%r` not in range(0x10000)' % value)
 		self.raw_data['secs'] = value
 
 	@property
 	def client_ip(self):
 		return IPv4Address(self.raw_data['ciaddr'])
+
 	@client_ip.setter
 	def client_ip(self, value):
 		ip = IPv4Address(value)
@@ -283,6 +308,7 @@ class BOOTP:
 	@property
 	def your_ip(self):
 		return IPv4Address(self.raw_data['yiaddr'])
+
 	@your_ip.setter
 	def your_ip(self, value):
 		ip = IPv4Address(value)
@@ -291,6 +317,7 @@ class BOOTP:
 	@property
 	def server_ip(self):
 		return IPv4Address(self.raw_data['siaddr'])
+
 	@server_ip.setter
 	def server_ip(self, value):
 		ip = IPv4Address(value)
@@ -299,6 +326,7 @@ class BOOTP:
 	@property
 	def gateway_ip(self):
 		return IPv4Address(self.raw_data['giaddr'])
+
 	@gateway_ip.setter
 	def gateway_ip(self, value):
 		ip = IPv4Address(value)
@@ -307,11 +335,12 @@ class BOOTP:
 	@property
 	def server_name(self):
 		return self.raw_data['sname'].rstrip(b'\0')
+
 	@server_name.setter
 	def server_name(self, value):
 		data = value
 		if len(data) > 64:
-			raise Error('encoded server name too long: `%r`' % value)
+			raise DHCPv4Error('encoded server name too long: `%r`' % value)
 		self.raw_data['sname'] = (
 			data + b'\0'*64
 		)[:64]
@@ -319,11 +348,12 @@ class BOOTP:
 	@property
 	def boot_file_name(self):
 		return self.raw_data['file'].rstrip(b'\0')
+
 	@boot_file_name.setter
 	def boot_file_name(self, value):
 		data = value
 		if len(data) > 128:
-			raise Error('encoded boot file name too long: `%r`' % value)
+			raise DHCPv4Error('encoded boot file name too long: `%r`' % value)
 		self.raw_data['file'] = (
 			data + b'\0'*128
 		)[:128]
@@ -331,11 +361,12 @@ class BOOTP:
 	@property
 	def vendor(self):
 		return self.raw_data['vend']
+
 	@vendor.setter
 	def vendor(self, value):
 		data = bytes(value)
 		if len(data) > 64:
-			raise Error('vendor data too long: `%r`' % value)
+			raise DHCPv4Error('vendor data too long: `%r`' % value)
 		self.raw_data['vend'] = (
 			data + b'\0'*64
 		)
@@ -396,40 +427,43 @@ class BOOTP:
 		self.raw_data = structured_data._asdict()
 		return self
 
+
 DHCP_MAGIC_COOKIE = b'\x63\x82\x53\x63'
+
 
 class DHCP(BOOTP):
 	NAMES = namedtuple('Fields', 'op htype hlen hops xid secs flags ciaddr'
-		' yiaddr siaddr giaddr chaddr sname file', defaults=(None,)*14
-	)
+		' yiaddr siaddr giaddr chaddr sname file', defaults=(None,)*14)
 	CODEC = struct.Struct(
-		'!'		# network byte order (big)
-		'BBBB'	# op, htype, hlen, hops
-		'I'		# xid
-		'HH'	# secs, flags
-		'4s'	# ciaddr (client ip)
-		'4s'	# yiaddr (given ip by server)
-		'4s'	# siaddr (server ip address)
-		'4s'	# giaddr (gateway ip address)
-		'16s'	# chaddr (client hardware address)
-		'64s'	# server host name (null-terminated)
-		'128s'	# boot file name (null-terminated)
-		#'312s'	# dhcp options (parsing in `decode()`)
+		'!'			# network byte order (big)
+		'BBBB'		# op, htype, hlen, hops
+		'I'			# xid
+		'HH'		# secs, flags
+		'4s'		# ciaddr (client ip)
+		'4s'		# yiaddr (given ip by server)
+		'4s'		# siaddr (server ip address)
+		'4s'		# giaddr (gateway ip address)
+		'16s'		# chaddr (client hardware address)
+		'64s'		# server host name (null-terminated)
+		'128s'		# boot file name (null-terminated)
+		# '312s'	# dhcp options (parsing in `decode()`)
 	)
 
 	@property
 	def flags(self):
 		return Flags(self.raw_data['flags'])
+
 	@flags.setter
 	def flags(self, value):
 		if value not in range(0x10000):
-			raise Error('`%r` not in range(0x10000)' % value)
+			raise DHCPv4Error('`%r` not in range(0x10000)' % value)
 		self.raw_data['flags'] = Flags(value)
 
 	@property
 	def vendor(self):
 		warn('use .options instead of .vendor for DHCP', DeprecationWarning)
 		return super().vendor
+
 	@vendor.setter
 	def vendor(self, value):
 		warn('use .options instead of .vendor for DHCP', DeprecationWarning)
@@ -486,7 +520,7 @@ class DHCP(BOOTP):
 			'options={options!r}'.format(options=self.options)
 		)
 
-# TODO(tori): add support for option overload in encode() function
+	# TODO(tori): add support for option overload in encode() function
 	def encode(self):
 		base_encoded = super().encode()
 		return base_encoded + DHCP_MAGIC_COOKIE + self.options.encode()

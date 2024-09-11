@@ -1,6 +1,6 @@
 [project]
 name = "dhcp"
-version = "1.0.0"
+version = "1.0.1"
 authors = [
 	{ name = "Tori", email = "wiredwolf@wiredwolf.gg" }
 ]
