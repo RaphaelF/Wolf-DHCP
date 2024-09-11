@@ -1,0 +1,23 @@
+[project]
+name = "dhcp"
+version = "1.0.0"
+authors = [
+	{ name = "Tori", email = "wiredwolf@wiredwolf.gg" }
+]
+description = "DHCP implementation compliant with standards"
+readme = "README.md"
+requires-python = ">=3.8"
+keywords = ["dhcp", "tftp", "pxe"]
+license = { text = "MIT" }
+classifiers = [
+	"Programming Language :: Python :: 3",
+	"License :: OSI Approved :: MIT License",
+	"Operating System :: POSIX"
+]
+
+[project.urls]
+"Homepage" = "https://github.com/wiredwolf28/dhcp"
+"Bug Tracker" = "https://github.com/wiredwolf28/dhcp/issues"
+
+[build-system]
+requires = ["setuptools"]
