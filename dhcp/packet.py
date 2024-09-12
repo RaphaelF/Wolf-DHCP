@@ -5,6 +5,7 @@ from binascii import crc32
 from ipaddress import IPv4Address, IPv6Address
 from random import randrange
 
+
 def calculate_internet_checksum(packet):
 	"""Calculate checksum of data as defined in RFC791."""
 	if len(packet)%2:
@@ -17,11 +18,14 @@ def calculate_internet_checksum(packet):
 		checksum = (checksum & 0xFFFF) + (checksum >> 16)
 	return ~checksum & 0xFFFF
 
+
 # NOTE(tori): only generate checksum if absolutely necessary, it seems the
 # driver will automatically generate one if one is not passed, according to SO
 # https://stackoverflow.com/questions/1117958/how-do-i-use-raw-socket-in-python#comment22219164_6374862
 IPV4_ETHERTYPE = 0x0800
 IPV6_ETHERTYPE = 0x86DD
+
+
 def encapsulate_ethernet(source, destination, ethertype, data, tag=None,
 	generate_checksum=False):
 	"""Wrap data in ethernet frame information."""
@@ -34,7 +38,7 @@ def encapsulate_ethernet(source, destination, ethertype, data, tag=None,
 
 	try:
 		ethertype = struct.pack('!H', ethertype)
-	except:
+	except Exception:
 		ethertype = bytes(ethertype)
 	if len(ethertype) != 2:
 		raise Exception('bad ethertype: %r' % ethertype)
@@ -57,10 +61,12 @@ def encapsulate_ethernet(source, destination, ethertype, data, tag=None,
 
 	return frame
 
+
 IPV4_FLAG_RESERVED = 0x04
 IPV4_FLAG_EVIL = 0x04
 IPV4_FLAG_DONT_FRAGMENT = 0x02
 IPV4_FLAG_MORE_FRAGMENTS = 0x01
+
 
 def encapsulate_ipv4(source, destination, protocol, data, *,
 	differentiated_services_code_point=0, explicit_congestion_notification=0,
@@ -115,6 +121,7 @@ def encapsulate_ipv4(source, destination, protocol, data, *,
 
 	return header + data
 
+
 def encapsulate_ipv6(source, destination, next_header, data, *,
 	differentiated_services_field=0, explicit_congestion_notification=0,
 	payload_length=None, flow_label=None, hop_limit=64):
@@ -148,11 +155,13 @@ def encapsulate_ipv6(source, destination, next_header, data, *,
 	version = 6
 
 	header = struct.pack('!IHBB16s16s', (version << 28)
-	| (differentiated_services_field << 22)
-	| (explicit_congestion_notification << 20) | flow_label, payload_length,
-	next_header, hop_limit, source.packed, destination.packed)
+		| (differentiated_services_field << 22)
+		| (explicit_congestion_notification << 20) | flow_label,
+		payload_length, next_header, hop_limit, source.packed,
+		destination.packed)
 
 	return header + data
+
 
 def make_ipv4_pseudoheader(source, destination, protocol, data_length):
 	source = IPv4Address(source)
@@ -164,6 +173,7 @@ def make_ipv4_pseudoheader(source, destination, protocol, data_length):
 	return struct.pack('!4s4sxBH', source.packed, destination.packed, protocol,
 		data_length)
 
+
 def make_ipv6_pseudoheader(source, destination, next_header, data_length):
 	source = IPv6Address(source)
 	destination = IPv6Address(destination)
@@ -171,8 +181,9 @@ def make_ipv6_pseudoheader(source, destination, next_header, data_length):
 	if next_header not in range(1 << 8):
 		raise Exception('bad "Next Header" value: %r' % next_header)
 
-	return struct.pack('!16s16sII', source.packed, destination.packed, 
+	return struct.pack('!16s16sII', source.packed, destination.packed,
 		data_length, next_header)
+
 
 def encapsulate_udp(source, destination, data, *, pseudoheader=None):
 	if source not in range(1 << 16):
@@ -191,7 +202,8 @@ def encapsulate_udp(source, destination, data, *, pseudoheader=None):
 		checksum = calculate_internet_checksum(pseudoheader + udp_header
 			+ data)
 
-	udp_header = struct.pack('!HHHH', source, destination, len(data) + 8, checksum)
+	udp_header = struct.pack('!HHHH', source, destination, len(data) + 8,
+		checksum)
 
 	return udp_header + data
 

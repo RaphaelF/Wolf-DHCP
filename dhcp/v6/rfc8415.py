@@ -9,6 +9,7 @@ from uuid import UUID
 from .optiontypes import register as register_optiontype
 from .option_codecs import register as register_optioncodec, Codec
 
+
 class RFC8415OptionType(enum.IntEnum):
 	CLIENTID = 1
 	SERVERID = 2
@@ -35,25 +36,32 @@ class RFC8415OptionType(enum.IntEnum):
 	SOL_MAX_RT = 82
 	INF_MAX_RT = 83
 
+
 class DUID:
 	DUID_TYPE = None
 	DUID_TYPES = {}
+
 	def __init_subclass__(cls, /, duid_type):
 		cls.__bases__[0].DUID_TYPES[duid_type] = cls
+
 	@classmethod
 	def decode(cls, duid):
 		duid_type, = struct.unpack_from('!H', duid)
 		return cls.DUID_TYPES[duid_type].decode(duid)
 
+
 class DUID_LLT(DUID, duid_type=1):
 	STRUCT = struct.Struct('!HHI')
+
 	def __init__(self, hardware_type, time, link_layer_address):
 		self.hardware_type = hardware_type
 		self.time = time
 		self.link_layer_address = link_layer_address
+
 	def encode(self):
 		return (self.STRUCT.pack(1, self.hardware_type, self.time)
 			+ self.link_layer_address)
+
 	@classmethod
 	def decode(cls, duid):
 		duid_type, hardware_type, time = cls.STRUCT.unpack_from(duid)
@@ -61,13 +69,17 @@ class DUID_LLT(DUID, duid_type=1):
 		self = cls(hardware_type, time, link_layer_address)
 		return self
 
+
 class DUID_EN(DUID, duid_type=2):
 	STRUCT = struct.Struct('!HI')
+
 	def __init__(self, enterprise_number, identifier):
 		self.enterprise_number = enterprise_number
 		self.identifier = identifier
+
 	def encode(self):
 		return self.STRUCT.pack(2, self.enterprise_number) + self.identifier
+
 	@classmethod
 	def decode(cls, duid):
 		duid_type, enterprise_number = cls.STRUCT.unpack_from(duid)
@@ -75,14 +87,18 @@ class DUID_EN(DUID, duid_type=2):
 		self = cls(enterprise_number, identifier)
 		return self
 
+
 class DUID_LL(DUID, duid_type=3):
 	STRUCT = struct.Struct('!HH')
+
 	def __init__(self, hardware_type, link_layer_address):
 		self.hardware_type = hardware_type
 		self.link_layer_address = link_layer_address
+
 	def encode(self):
 		return (self.STRUCT.pack(3, self.hardware_type)
 			+ self.link_layer_address)
+
 	@classmethod
 	def decode(cls, duid):
 		duid_type, hardware_type = cls.STRUCT.unpack_from(duid)
@@ -90,25 +106,32 @@ class DUID_LL(DUID, duid_type=3):
 		self = cls(hardware_type, link_layer_address)
 		return self
 
+
 class DUID_UUID(DUID, duid_type=4):
 	STRUCT = struct.Struct('!H16s')
+
 	def __init__(self, uuid):
 		self.uuid = UUID(uuid)
+
 	def encode(self):
 		return self.STRUCT.pack(4, self.uuid.bytes)
+
 	@classmethod
 	def decode(cls, duid):
 		duid_type, uuid = cls.STRUCT.unpack_from(duid)
 		self = cls(uuid)
 		return self
 
+
 def encode_duid(decoded):
 	if not isinstance(decoded, DUID):
 		raise Exception('%r is not a DUID' % decoded)
 	return decoded.encode()
-	
+
+
 def decode_duid(encoded):
 	return DUID.decode(encoded)
+
 
 rfc8415_option_codec = Codec(
 	name='rfc8415',

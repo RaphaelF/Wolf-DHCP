@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """PXE
 
-PXE launcher for dhcp server 
+PXE launcher for dhcp server
 
 """
 
@@ -20,6 +20,7 @@ __date__ = '2023-08-27'
 # SPDX-License-Identifier: MIT
 __license__ = 'MIT'
 __copyright__ = '2023 Tori Wolf'
+
 
 def make_option_getter(mapping, ip):
 	if mapping is None:
@@ -57,12 +58,14 @@ def make_option_getter(mapping, ip):
 
 	return get_options
 
+
 def tftp_server_target(logger, ip, root, state):
 	logger.info('tftp server starting')
 	server = tftp.Server(logger, tftp.folder_manager(root), ip)
 	while state['running']:
 		server.accept()
 	server.wait_until_finished()
+
 
 def dhcp_server_target(logger, interface, options, get_options, capture_file,
 	state):
@@ -76,6 +79,7 @@ def dhcp_server_target(logger, interface, options, get_options, capture_file,
 	if capture_file is not None:
 		with open(capture_file, 'wb') as pcap_file:
 			pcap_file.write(pcap.encode())
+
 
 def main():
 	import argparse

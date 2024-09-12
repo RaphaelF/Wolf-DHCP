@@ -14,6 +14,7 @@ import uuid
 from .optiontypes import register as register_optiontype
 from .option_codecs import register as register_optioncodec, Codec
 
+
 class RFC4578OptionType(enum.IntEnum):
 	CLIENT_SYSTEM_ARCHITECTURE_TYPE = 93
 	CLIENT_NETWORK_INTERFACE_IDENTIFIER = 94
@@ -27,6 +28,7 @@ class RFC4578OptionType(enum.IntEnum):
 	PXE_RESERVED_134 = 134
 	PXE_RESERVED_135 = 135
 
+
 class ArchitectureType(enum.IntEnum):
 	INTEL_X86PC = 0
 	NEC_PC98 = 1
@@ -39,6 +41,7 @@ class ArchitectureType(enum.IntEnum):
 	EFI_XSCALE = 8
 	EFI_BC = 9
 
+
 def encode_client_system_architecture_type(decoded):
 	try:
 		types = tuple(decoded)
@@ -48,6 +51,7 @@ def encode_client_system_architecture_type(decoded):
 	if len(encoded) == 0:
 		raise ValueError('no client system architectures defined')
 	return encoded
+
 
 def decode_client_system_architecture_type(encoded):
 	if len(encoded) == 0:
@@ -64,8 +68,11 @@ def decode_client_system_architecture_type(encoded):
 	decoded = tuple(decoded)
 	return decoded
 
+
 class NetworkInterfaceType(enum.IntEnum):
-	UNIVERSAL_NETWORK_DEVICE_IDENTIFIER = 1; UNDI = 1
+	UNIVERSAL_NETWORK_DEVICE_IDENTIFIER = 1
+	UNDI = 1
+
 
 def encode_client_network_interface_identifier(decoded):
 	type_, major, minor = decoded
@@ -73,13 +80,17 @@ def encode_client_network_interface_identifier(decoded):
 	encoded = struct.pack('!BBB', type_, major, minor)
 	return encoded
 
+
 def decode_client_network_interface_identifier(encoded):
 	type_, major, minor = struct.unpack('!BBB', encoded)
 	decoded = (NetworkInterfaceType(type_), major, minor)
 	return decoded
 
+
 class MachineIdentifierType(enum.IntEnum):
-	GLOBALLY_UNIQUE_IDENTIFIER = 0; GUID = 0
+	GLOBALLY_UNIQUE_IDENTIFIER = 0
+	GUID = 0
+
 
 def encode_client_machine_identifier(decoded):
 	type_, data = decoded
@@ -96,6 +107,7 @@ def encode_client_machine_identifier(decoded):
 
 	return encoded
 
+
 def decode_client_machine_identifier(encoded):
 	type_, = struct.unpack_from('!B', encoded)
 	data = encoded[1:]
@@ -109,6 +121,7 @@ def decode_client_machine_identifier(encoded):
 		raise ValueError('unhandled machine identifier type: %r' % type_)
 
 	return decoded
+
 
 rfc4578_option_codec = Codec(
 	name='rfc4578',

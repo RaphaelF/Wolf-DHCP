@@ -15,10 +15,9 @@ try:
 	from . import v4 as ipv4
 	from . import v6 as ipv6
 except ImportError as e:
-	print('Could not import DHCP')
+	print('Could not import DHCP: %r' % e)
 	raise
 
 __all__ = ['ipv4', 'ipv6']
 
 # vim:set ft=python ts=4 sw=4 ai noet cc=80:
-

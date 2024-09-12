@@ -20,11 +20,13 @@ uint16 = Struct('!H')
 int32 = Struct('!i')
 uint32 = Struct('!I')
 
+
 def make_unpacker(struct):
 	def unpacker(b):
 		result, = struct.unpack(b)
 		return result
 	return unpacker
+
 
 def make_guarded(fn, check=lambda _: True, exc=None):
 	@wraps(fn)
@@ -35,7 +37,7 @@ def make_guarded(fn, check=lambda _: True, exc=None):
 			if exc is None:
 				exc = Exception('invalid function call: %s(*%r, **%r)' % (
 					fn.__name__, args, kwargs))
-			elif type(exc) == type and issubclass(exc, BaseException):
+			elif isinstance(exc, type) and issubclass(exc, BaseException):
 				# NOTE(tori): just raise the bare error
 				pass
 			elif isinstance(exc, str):
@@ -46,39 +48,51 @@ def make_guarded(fn, check=lambda _: True, exc=None):
 		return fn(*args, **kwargs)
 	return wrapper
 
+
 def encode_netbios_node_type(decoded):
 	if decoded not in (0x1, 0x2, 0x4, 0x8):
 		raise ValueError('invalid NetBIOS over TCP/IP Node Type value')
 	return uint8.pack(decoded)
+
+
 def decode_netbios_node_type(encoded):
 	return uint8.unpack(encoded)
 
+
 def encode_empty(decoded):
 	return b''
+
+
 def decode_empty(encoded):
 	return None
+
 
 def encode_ip(decoded):
 	try:
 		return IPv4Address(decoded).packed
-	except:
+	except Exception:
 		raise ValueError('invalid decoded IP: %r' % decoded)
-		
+
+
 def decode_ip(encoded):
 	try:
 		return IPv4Address(encoded)
-	except:
+	except Exception:
 		raise ValueError('invalid encoded IP: %r' % encoded)
+
 
 def encode_ips(decoded):
 	try:
 		return b''.join(IPv4Address(value).packed for value in decoded)
-	except:
+	except Exception:
 		raise ValueError('invalid encoded IP list: %r' % decoded)
+
+
 def decode_ips(encoded):
 	if len(encoded)%4 != 0:
 		raise ValueError('invalid decoded IP list: %r' % encoded)
 	return [decode_ip(bytes(value)) for value in zip(*[iter(encoded)]*4)]
+
 
 def encode_ip_pairs(decoded):
 	try:
@@ -87,8 +101,10 @@ def encode_ip_pairs(decoded):
 			for pair
 			in decoded
 		)
-	except:
+	except Exception:
 		raise ValueError('invalid decoded IP pair list: %r' % decoded)
+
+
 def decode_ip_pairs(encoded):
 	if len(encoded)%8 != 0:
 		raise ValueError('invalid encoded IP pair list: %r' % encoded)
@@ -99,20 +115,26 @@ def decode_ip_pairs(encoded):
 		result.append((first, second))
 	return result
 
+
 def encode_string(decoded):
 	return decoded.encode('ascii')
+
+
 def decode_string(encoded):
 	return encoded.decode('ascii')
+
 
 # NOTE(tori): guard only the encodes, per Postel's Law
 bool_codec = (boolean.pack, make_unpacker(boolean))
 empty_codec = (encode_empty, decode_empty)
 ip_codec = (encode_ip, decode_ip)
 ip_list_codec = (
-	make_guarded(encode_ips, lambda lst: iter(lst) and len(lst) > 0), decode_ips
+	make_guarded(encode_ips, lambda lst: iter(lst) and len(lst) > 0),
+	decode_ips
 )
 ip_pair_codec = (
-	make_guarded(encode_ip_pairs, lambda lst: iter(lst) and len(lst) > 0), decode_ip_pairs
+	make_guarded(encode_ip_pairs, lambda lst: iter(lst) and len(lst) > 0),
+	decode_ip_pairs
 )
 string_codec = (
 	make_guarded(encode_string, lambda s: len(s) > 0), decode_string
@@ -124,7 +146,8 @@ rfc2132_option_codec = Codec(
 	codecs={
 		RFC2132OptionType.PAD: empty_codec,
 		RFC2132OptionType.END: empty_codec,
-# XXX(tori): is there a better way? this feels weird calling an IP a mask
+		# XXX(tori): is there a better way? this feels weird calling an IP a
+		# mask
 		RFC2132OptionType.SUBNET_MASK: ip_codec,
 		RFC2132OptionType.TIME_OFFSET: (int32.pack, make_unpacker(int32)),
 		RFC2132OptionType.ROUTER: ip_list_codec,
@@ -157,13 +180,12 @@ rfc2132_option_codec = Codec(
 			make_guarded(uint8.pack, lambda n: n > 0,
 				'value must be greater than 0'),
 			make_unpacker(uint8)
-		)
-,
+		),
 		RFC2132OptionType.PATH_MTU_AGING_TIMEOUT: uint32_codec,
 		RFC2132OptionType.PATH_MTU_PLATEAU_TABLE: (
 			make_guarded(
-				lambda l: b''.join(uint16.pack(e) for e in l),
-				lambda l: all(e >= 68 for e in l),
+				lambda lst: b''.join(uint16.pack(elt) for elt in lst),
+				lambda lst: all(elt >= 68 for elt in lst),
 				'MTU must be at least 68'
 			),
 			lambda b: [uint16.unpack(bytes(v))[0] for v in zip(*[iter(b)]*2)]

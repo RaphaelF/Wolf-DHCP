@@ -13,6 +13,7 @@ from errno import ENOSPC
 from ipaddress import IPv4Address
 from pathlib import Path
 from struct import Struct, error as StructError
+from sys import stderr
 try:
 	import enum
 except ImportError:
@@ -21,8 +22,12 @@ except ImportError:
 		IntEnum = object
 		IntFlag = object
 		Flag = object
-		unique = lambda method: method
-		auto = lambda: 1/0
+
+		def unique(method):
+			return method
+
+		def auto(method):
+			return 1/0
 	enum = enum()
 
 _netascii_encode_table = {
@@ -43,10 +48,14 @@ _netascii_decode_table = {
 
 _netascii_codec_name = 'netascii'
 
+
 class NetASCIIEncodeError(ValueError):
 	pass
+
+
 class NetASCIIDecodeError(ValueError):
 	pass
+
 
 def _netascii_encode(s):
 	try:
@@ -58,6 +67,8 @@ def _netascii_encode(s):
 			'%r codec can\'t encode character %r at position %r: %s'
 			% (_netascii_codec_name, key, idx, 'Invalid Character')
 		) from None
+
+
 def _netascii_decode(b):
 	result = []
 	accumulator = b''
@@ -66,7 +77,7 @@ def _netascii_decode(b):
 			accumulator += bytes([byte])
 			if accumulator in _netascii_decode_table:
 				result.append(_netascii_decode_table[accumulator])
-				accumulator = b'' 
+				accumulator = b''
 			if len(accumulator) > 2:
 				key = accumulator
 				idx = index - len(accumulator)
@@ -85,25 +96,35 @@ def _netascii_decode(b):
 		raise e
 	return ''.join(result), len(b)
 
+
 def _netascii_search_function(encoding_name):
 	return codecs.CodecInfo(_netascii_encode, _netascii_decode,
 		name=_netascii_codec_name)
 
+
 codecs.register(_netascii_search_function)
 
-class BaseError(Exception):
+
+class Error(Exception):
 	pass
 
-class MalformedPacketError(BaseError):
+
+class MalformedPacketError(Error):
 	pass
+
 
 class Operation(enum.IntEnum):
-	READ_REQUEST = 1; RRQ = 1
-	WRITE_REQUEST = 2; WRQ = 2
+	READ_REQUEST = 1
+	RRQ = 1
+	WRITE_REQUEST = 2
+	WRQ = 2
 	DATA = 3
-	ACKNOWLEDGEMENT = 4; ACK = 4
+	ACKNOWLEDGEMENT = 4
+	ACK = 4
 	ERROR = 5
-	OPTION_ACKNOWLEDGEMENT = 6; OACK = 6
+	OPTION_ACKNOWLEDGEMENT = 6
+	OACK = 6
+
 
 class Error(enum.IntEnum):
 	UNDEFINED = 0
@@ -116,10 +137,13 @@ class Error(enum.IntEnum):
 	NO_SUCH_USER = 7
 	UNSUPPORTED_OPTIONS = 8
 
+
 SHORT = Struct('!H')
+
 
 class BasePacket:
 	pass
+
 
 @dataclass
 class ReadPacket(BasePacket):
@@ -127,37 +151,44 @@ class ReadPacket(BasePacket):
 	transfer_mode: str
 	options: list
 
+
 @dataclass
 class WritePacket(BasePacket):
 	filename: str
 	transfer_mode: str
 	options: list
 
+
 @dataclass
 class DataPacket(BasePacket):
 	block_number: int
 	data: bytes
 
+
 @dataclass
 class AckPacket(BasePacket):
 	block_number: int
+
 
 @dataclass
 class ErrorPacket(BasePacket):
 	error_code: Error
 	error_message: str
 
+
 @dataclass
 class OptionAckPacket(BasePacket):
 	options: list
+
 
 def decode_short(pkt):
 	try:
 		value, = SHORT.unpack_from(pkt)
 		pkt = pkt[SHORT.size:]
-	except:
+	except Exception:
 		raise MalformedPacketError('invalid short') from None
 	return value, pkt
+
 
 def decode_string(pkt):
 	try:
@@ -166,6 +197,7 @@ def decode_string(pkt):
 	except (ValueError, NetASCIIDecodeError):
 		raise MalformedPacketError('invalid string') from None
 	return string, remainder
+
 
 def decode_options(pkt):
 	options = []
@@ -176,6 +208,7 @@ def decode_options(pkt):
 		options.append((name, value))
 
 	return options
+
 
 def decode_packet(pkt: bytes) -> BasePacket:
 	operation, pkt = decode_short(pkt)
@@ -212,7 +245,8 @@ def decode_packet(pkt: bytes) -> BasePacket:
 		options = decode_options(pkt)
 		return OptionAckPacket(options)
 	else:
-		raise BaseError('unimplemented operation: %r' % op)
+		raise Error('unimplemented operation: %r' % op)
+
 
 def encode_short(value, pkt=b''):
 	try:
@@ -220,17 +254,20 @@ def encode_short(value, pkt=b''):
 	except StructError:
 		raise ValueError('invalid value: %r' % value)
 
+
 def encode_string(string, pkt=b''):
 	try:
 		return pkt + string.encode('netascii') + b'\0'
 	except NetASCIIEncodeError:
 		raise ValueError('invalid string: %r' % string)
 
+
 def encode_options(options, pkt=b''):
 	for key, value in options:
 		pkt = encode_string(key, pkt)
 		pkt = encode_string(value, pkt)
 	return pkt
+
 
 def encode_packet(pkt: BasePacket) -> bytes:
 	if isinstance(pkt, (ReadPacket, WritePacket)):
@@ -260,10 +297,12 @@ def encode_packet(pkt: BasePacket) -> bytes:
 		result = encode_options(pkt.options, result)
 		return result
 	else:
-		raise BaseError('unimplemented packet type: %r' % pkt)
+		raise Error('unimplemented packet type: %r' % pkt)
+
 
 def folder_manager(folder=Path.cwd()):
 	folder = Path(folder)
+
 	def opener(name, mode):
 		name = Path(name)
 		if name.is_absolute():
@@ -272,6 +311,7 @@ def folder_manager(folder=Path.cwd()):
 		if not target.resolve().is_relative_to(folder.resolve()):
 			raise Exception('access violation')
 		return open(target, mode)
+
 	def sizer(name):
 		name = Path(name)
 		if name.is_absolute():
@@ -281,6 +321,7 @@ def folder_manager(folder=Path.cwd()):
 			raise Exception('access violation')
 		return target.stat().st_size
 	return opener, sizer
+
 
 # NOTE(tori): we're not using socketserver because I want more control over
 # stuff about my server
@@ -399,7 +440,7 @@ class Server:
 						response = DataPacket(block_number, data)
 						client_socket.sendto(encode_packet(response), address)
 						# NOTE(tori): allow block overflow
-#					block_number = (block_number + 1)%65536 or 1
+						# block_number = (block_number + 1)%65536 or 1
 						# NOTE(tori): the above does not seem to work for GRUB
 						block_number = (block_number + 1)%65536
 						if len(data) < block_size:
@@ -428,7 +469,7 @@ class Server:
 						self.send_error(client_socket, address,
 							Error.ILLEGAL_OPERATION)
 						return
-					if len(data) < block_size:
+					if len(packet.data) < block_size:
 						break
 
 	def handle_write(self, packet, address):
@@ -492,7 +533,7 @@ class Server:
 						return
 					response = AckPacket(packet.block_number)
 					client_socket.sendto(encode_packet(response), address)
-					if len(data) < block_size:
+					if len(packet.data) < block_size:
 						break
 				if expected_size is not None:
 					if received_size != expected_size:
@@ -542,13 +583,14 @@ class Server:
 			self.socket.sendto(encode_packet(response), address)
 			self.logger.warning('unsolicited packet type: %r' % type(packet))
 
-#def main():
-#	x = Server(folder_manager('./tftpboot'))
-#	while True:
-#		try:
-#			x.accept()
-#		except KeyboardInterrupt:
-#			break
+# def main():
+# 	x = Server(folder_manager('./tftpboot'))
+# 	while True:
+# 		try:
+# 			x.accept()
+# 		except KeyboardInterrupt:
+# 			break
+
 
 def is_directory(f):
 	f = Path(f)
@@ -556,6 +598,7 @@ def is_directory(f):
 		return f
 	else:
 		raise argparse.ArgumentTypeError('"%s" is not a valid directory' % f)
+
 
 def configure_logging(output='-', level='INFO'):
 	if isinstance(output, str):
@@ -579,9 +622,8 @@ def configure_logging(output='-', level='INFO'):
 
 	return logger
 
-server = None
+
 def main():
-	global server
 	parser = argparse.ArgumentParser()
 	parser.add_argument('-f', '--log-file', default='-',
 		type=argparse.FileType('w'), help='location to log messages')
@@ -608,6 +650,7 @@ def main():
 		except KeyboardInterrupt:
 			server.wait_until_finished()
 			break
+
 
 if __name__ == '__main__':
 	main()

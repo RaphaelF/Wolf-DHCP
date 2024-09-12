@@ -10,6 +10,7 @@ DHCP_TYPE = socket.SOCK_DGRAM
 DHCP_CLIENT_PORT = 546
 DHCP_SERVER_PORT = 547
 
+
 def listen():
 	return multicast_listen(DHCP_ADDRESS, DHCP_SERVER_PORT, DHCP_TYPE)
 

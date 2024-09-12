@@ -2,6 +2,7 @@
 
 __all__ = ['TypeRegistry', 'TypeList']
 
+
 class TypeRegistry:
 	def __init__(self):
 		self.OptionTypes = []
@@ -32,14 +33,17 @@ class TypeRegistry:
 					% value
 				)
 
+
 class TypeList:
 	def __init__(self, registry, ntypes=256):
 		self.ntypes = ntypes
 		self.registry = registry
+
 	def __getitem__(self, index):
 		if index not in range(self.ntypes):
 			raise IndexError('%r is not an option type' % index)
 		return self.registry.get(index, ignore_unknown=True)
+
 	def __iter__(self):
 		return (self.registry.get(n, ignore_unknown=True)
 			for n in range(self.ntypes))
